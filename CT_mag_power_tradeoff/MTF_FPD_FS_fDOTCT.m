@@ -1,0 +1,114 @@
+% Script to compute MTF combining detector MTF and focal spot
+% for the time being we get the maximum MTF 50% and 10% for a range of
+% magnification factors...
+
+% X-ray source
+% The x-ray focal spot is variable, changing with requested power according to manufacturer specifications
+fs_off   = 0.015;     % Minimum focal spot (mm)
+fs_max   = 0.080;     % Maximum focal spot (mm)
+slope    = 1.478e-03; % Slope of the focal spot curve (mm/W)
+P_cutoff = 6;         % Minimum power (W) from which the linear model starts to work, below this power value the size of focal spot is fs_off
+P_max    = 50;        % Maximum power (W)
+% Build the vector with the focal spots...
+nP = 50;                                                      % Number of values in the vector for power
+P  = P_cutoff + (0:(P_max-P_cutoff)/(nP-1):(P_max-P_cutoff)); % Power values
+fs = fs_off + slope*(P-P_cutoff);                             % Focal spot values for the power selected (mm)
+%fs=0.3;
+% Detector features
+% This is for the Dexela model
+a_pix = 0.0748; % Pixel aperture in mm - we do not know fill factor
+% Anyways we ended up copying the MTF provided by the manufacturer - but
+% have only some points so far
+fu       = [0 1    2    3    4    5    6    6.5];    % Frecuency points where we have valid data (lp/mm)
+MTF_prev = [1 0.88 0.69 0.53 0.41 0.31 0.24 0.2];    % Values of MTF in the points provided just above
+
+
+% Final frecuency array for MTF determination
+f = 0:0.01:40;
+
+% Range of Mag values - This should be related to our geometrical configuration...
+% Let's get it from a range of distances which is the equivalent data we really know
+SAD   = 62;                              % Source to Axis Distance (SAD) (mm). The x-ray source is fixed, thus we do not have to modify this value along the calculation 
+nADD  = 50;                               % Number of ADD values to simulate
+ADD_m = 68;                               % Minimum Axis to Detector Distances (ADD) (mm)
+ADD_t = 152;                              % Detector travel set by the Owis stage (mm)
+ADD   = ADD_m + (0:ADD_t/(nADD-1):ADD_t); % Array to store ADD, we set the minimum and then the travel
+M     = (SAD+ADD)*(1/SAD);                % Vector storing the magnification values arising from the parameters set
+
+% Resample detector MTF
+MTF_fpd = interp1(fu,MTF_prev,f,'linear','extrap');
+
+% Compute source focal spot MTF
+sizFr   = size(f);
+sizM    = size(M);
+sizF    = size(fs);
+MTFs_FS = zeros(sizM(2),sizF(2),sizFr(2));
+for indM = 1:sizM(2),
+	for indF = 1:sizF(2),
+        tmp = exp((-pi)*( ((fs(indF)*((M(indM)-1)/M(indM)))^2) * (f.^2)));
+		MTFs_FS(indM,indF,:) = tmp(:);
+	end
+end
+
+% Now translate MTF of the detector to the object plane...
+MTFs_fpd = zeros(sizM(2),sizF(2),sizFr(2));
+for indM = 1:sizM(2),
+	for indF = 1:sizF(2),
+		f_m = f/M(indM);
+        tmp = interp1(f,MTF_fpd,f_m,'spline');
+		MTFs_fpd(indM,indF,:) = tmp(:);
+	end
+end
+
+% Now get the total MTF as a product of both individual MTFs
+% MTF_s stands for MTF system
+MTF_s = MTFs_FS.*MTFs_fpd;
+
+% Now get the MTF 50%
+% Same thing for the loop
+MTF_50 = zeros(sizM(2),sizF(2));
+for indM = 1:sizM(2),
+	for indF = 1:sizF(2),
+		tmp               = find(MTF_s(indM,indF,:) <= 0.5); % Get the values below 50%
+		MTF_50(indM,indF) = f(tmp(1));                       % Use only the index of the first as the cutoff frequency
+	end
+end
+
+% and MTF 20%
+MTF_20 = zeros(sizM(2),sizF(2));
+for indM = 1:sizM(2),
+	for indF = 1:sizF(2),
+        tmp               = find(MTF_s(indM,indF,:) <= 0.2); % Get the values below 20%
+        MTF_20(indM,indF) = f(tmp(1));                       % Use only the index of the first as the cutoff frequency
+	end
+end
+
+% Plot results
+% MTF 50%
+figure;
+colormap(winter());
+surf(P,M,MTF_50);
+colorbar();
+xlabel('Power (W)');
+ylabel('Magnification');
+title('MTF 50%');
+% Isolated cases 
+figure;
+subplot(221);plot(P,MTF_50(1,:),'k','LineWidth',2);grid on;xlabel('Power (W)');ylabel('Spatial Frecuency (lp/mm)');title('MTF 50% M_m_i_n');
+subplot(222);plot(P,MTF_50(end,:),'k','LineWidth',2);grid on;xlabel('Power (W)');ylabel('Spatial Frecuency (lp/mm)');title('MTF 50% M_m_a_x');
+subplot(223);plot(M,MTF_50(:,1),'k','LineWidth',2);grid on;xlabel('Magnification');ylabel('Spatial Frecuency (lp/mm)');title('MTF 50% P_m_i_n');
+subplot(224);plot(M,MTF_50(:,end),'k','LineWidth',2);grid on;xlabel('Magnification');ylabel('Spatial Frecuency (lp/mm)');title('MTF 50% P_m_a_x');
+% MTF 20%
+figure;
+colormap(winter());
+surf(P,M,MTF_20);
+colorbar();
+xlabel('Power (W)');
+ylabel('Magnification');
+title('MTF 20%');
+% Isolated cases 
+figure;
+subplot(221);plot(P,MTF_20(1,:),'k','LineWidth',2);grid on;xlabel('Power (W)');ylabel('Spatial Frecuency (lp/mm)');title('MTF 20% M_m_i_n');
+subplot(222);plot(P,MTF_20(end,:),'k','LineWidth',2);grid on;xlabel('Power (W)');ylabel('Spatial Frecuency (lp/mm)');title('MTF 20% M_m_a_x');
+subplot(223);plot(M,MTF_20(:,1),'k','LineWidth',2);grid on;xlabel('Magnification');ylabel('Spatial Frecuency (lp/mm)');title('MTF 20% P_m_i_n');
+subplot(224);plot(M,MTF_20(:,end),'k','LineWidth',2);grid on;xlabel('Magnification');ylabel('Spatial Frecuency (lp/mm)');title('MTF 20% P_m_a_x');

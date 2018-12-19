@@ -1,0 +1,56 @@
+function [ imgOut ] = interppx(imgIn,bin)
+% Binning 4 image correction
+% Variables
+if(bin ==44)
+        col = [159 223 287 351 415 479 512 543 599 607 642];
+        lines = [457];
+        px = 
+else if (bin == 22)
+        col = [159 223 287 351 415 479 512 543 599 607 642];
+        lines = [457];
+    else if(bin==11)
+            col = [126 127 382,383,638,639,894,895,1150,1151,1406,1407,1662,1663,1918,1919,2174,2175,2396,2430,2431,2569,2686,2687,2942,2943];
+            lines = [1830 1831];
+        end
+    end
+end
+%col = col + 1; % Since the defect map started at 0
+col_prev = col - 1;
+col_post = col + 1;
+%lines = lines + 1;
+lin_prev = lines - 1;
+lin_post = lines + 1;
+%imgOut = zeros(560,586);
+%px = [ y
+%       x ]
+aux1 = 576:639;
+%aux2 = ones(size(aux1));
+
+%px = [aux1;457*aux2];
+%px = px + 1;
+%px_prev = px - 1;
+%px_post = px + 1;
+
+%Process
+imgOut = imgIn;
+%Auxiliar matrix with the values from the prev&post columns wrt the
+%column to correct
+aux(:,:,:,1) = imgIn(col_prev(:),:,:);
+aux(:,:,:,2) = imgIn(col_post(:),:,:);
+imgOut(col(:),:,:) = squeeze(mean(aux,4)); %Correct the columns by the mean values
+%Auxiliar matrix with the values from the prev&post lines wrt the
+%line to correct
+clear aux;
+aux(:,:,:,1) = imgIn(aux1,lin_prev(:),:);
+aux(:,:,:,2) = imgIn(aux1,lin_post(:),:);
+imgOut(aux1,lines(:),:) = squeeze(mean(aux,4));%Correct the lines by the mean values
+%Auxiliar matrix with the values from the left-right-up-down pixels wrt the
+%pixel to correct
+%clear aux;
+%aux(:,:,:,1) = imgIn(px_prev(2,:),px_prev(1,:),:);
+%aux(:,:,:,2) = imgIn(px(2,:),px_prev(1,:),:);
+%aux(:,:,:,3) = imgIn(px(2,:),px_post(1,:),:);
+%aux(:,:,:,4) = imgIn(px_post(2,:),px_post(1,:),:);
+%imgOut(px(2,:),px(1,:),:) = squeeze(mean(aux,4));%Correct the pixel by the mean value
+end
+

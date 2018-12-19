@@ -1,0 +1,62 @@
+temp_ref = zeros(80,21);
+dose = zeros(80,21);
+dose_crop = dose;
+temp_crop = temp_ref;
+temp_ref = xlsread('C:/Users/aeroesp/Documents/MATLAB/Comparativa.xlsx',4);
+dose = xlsread('C:/Users/aeroesp/Documents/MATLAB/Comparativa.xlsx',3);
+m = mean(dose,1);
+tam = size(dose);
+index_first = zeros(tam(1), tam(2));
+index_last = zeros(tam(1), tam(2));
+for i=1:2;
+    index1_aux(i,:) = find(dose(:,i)>m(i));
+    index_first(:,i) = [index1_aux(i,:)';zeros(tam(1)-length(index1_aux(i,:)),1)];
+    %if index1_aux(i,end) < tam(1)
+        indexL_aux(i,:) = find(dose(index1_aux(end):end,i)<2*m(i)/3);
+        %index_last(:,i) = [indexL_aux(i,:);zeros(tam(1)-size(indexL_aux(i)),1)];
+    %else
+        
+    end
+dose_crop(i,:) = dose(index1_aux(i,1):(index1_aux(i,end)+index_last(1,i)),i);
+temp_crop(i,:) = temp_ref(index_first(1,i):(index_first(end,i)+index_last(1,i)),i);
+% m = mean(ms150_640ma,1);
+% index_first = find(ms150_640ma>m);
+% index_last = find(ms150_640ma(index_first(end):end)<2*m/3);
+% ms150_640ma_new = ms150_640ma(index_first(1):(index_first(end)+index_last(1)));
+% %time_s = 0:length(ms500_640ma_new);
+% subplot(311);plot(ms500_640ma_new,'k-*');title('500ms');xlabel('Samples');ylabel('Dose Gy/s');
+% subplot(312);plot(ms150_640ma_new,'k-o');title('150ms');xlabel('Samples');ylabel('Dose Gy/s');
+% subplot(313);plot(ms500_640ma_new,'g');title('Comparison');xlabel('Samples');ylabel('Dose Gy/s');
+% hold on
+% subplot(313);plot(ms150_640ma_new,'r');
+
+% Compute maximum value to stay within Compound Poisson range, after that
+% values are considered saturated
+% We do that by finding the perpendicular projection of every point on the
+% line that connects the starting and ending point of the variance curve
+% The point with a larger distance should be a nice estimation of the elbow
+siz = size(dose_crop(i,:));
+v   = [temp_crop(i,siz(1))-temp_crop(i,1) dose_crop(i,siz(1))-dose_crop(i,1)]; % Director vector of the line
+vP  = [-v(2) v(1)];                                        % Director vector of the perpendicular line
+
+% Now find the intersection point of the two lines for every point in
+% pxVar, then the distance between the point and the line and the point w a
+% larger distance will be the corner (or an estimation of it...)
+% First we smooth the dose curve to somewhat reduce noise
+dose_s(i,:) = smooth(dose_crop,1);
+% Non-vectorized code...
+dist = zeros(siz(1),1);
+% Loop to solve the system of equations for the two lines and every point
+% As a result we get a group of distances
+for in = 1:siz(1),
+    k1 = v(1)*dose_crop(1)   - v(2)*temp_crop(1);
+    k2 = vP(1)*dose_crop(in) - vP(2)*temp_crop(in);
+    yT = (vP(2)*k1 - v(2)*k2)/(vP(2)*v(1) - vP(1)*v(2));
+    xT = (v(1)*yT - k1)/v(2);
+    % Now we get the distance value
+    dist(in) = sqrt(((dose_s(i,in)-yT)^2) + ((temp_crop(i,in)-xT)^2));
+end
+ind_sat = find(dist == max(dist)); % Elbow is around max dist ance to line
+%clear *crop
+%clear *aux
+end
